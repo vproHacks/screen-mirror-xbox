@@ -43,7 +43,7 @@ jobs:
           [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::the tag must look like v1.2.3, not '$TAG'"; exit 1; }
           echo "VERSION=${TAG#v}.0" >> "$GITHUB_ENV"
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: refs/tags/${{ inputs.tag }}
           submodules: true
@@ -72,7 +72,7 @@ jobs:
         id: vcpkg
         run: echo "key=vcpkg-app-$(git -C tools/vcpkg rev-parse HEAD)-${{ hashFiles('tools/setup-deps.sh') }}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: tools/vcpkg-cache
           key: ${{ steps.vcpkg.outputs.key }}
@@ -118,13 +118,13 @@ jobs:
         shell: cmd
         run: tools\build-store.cmd
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ScreenMirrorServer_${{ env.VERSION }}_store-upload
           path: build/AppPackages/ScreenMirrorServer_${{ env.VERSION }}_x64.msixupload
           if-no-files-found: error
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ScreenMirrorServer_${{ env.VERSION }}_sideload
           path: release/
