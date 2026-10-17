@@ -1,0 +1,6 @@
+[submodule "tools/vcpkg"]
+	path = tools/vcpkg
+	url = https://github.com/microsoft/vcpkg.git
+[submodule "third_party/UxPlay"]
+	path = third_party/UxPlay
+	url = https://github.com/FDH2/UxPlay.git

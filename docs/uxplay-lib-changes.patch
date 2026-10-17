@@ -1,0 +1,445 @@
+Only in src/airplay: LICENSE.UxPlay
+diff -ru --strip-trailing-cr -x CMakeLists.txt -x dns_sd third_party/UxPlay/lib/compat.h src/airplay/compat.h
+--- third_party/UxPlay/lib/compat.h	2026-10-17 05:52:09.575812800 -0400
++++ src/airplay/compat.h	2026-10-17 06:15:43.562240300 -0400
+@@ -25,7 +25,8 @@
+ #include <iphlpapi.h>
+ #include <mswsock.h>
+ #include <windows.h>
+-#ifndef snprintf
++/* MSVC >= 2015 has a conforming snprintf; _snprintf does not null-terminate */
++#if defined(_MSC_VER) && _MSC_VER < 1900 && !defined(snprintf)
+ #define snprintf _snprintf
+ #endif
+ #else
+diff -ru --strip-trailing-cr -x CMakeLists.txt -x dns_sd third_party/UxPlay/lib/crypto.c src/airplay/crypto.c
+--- third_party/UxPlay/lib/crypto.c	2026-10-17 05:52:09.575812800 -0400
++++ src/airplay/crypto.c	2026-10-17 06:17:32.284529700 -0400
+@@ -29,12 +29,59 @@
+ #include <openssl/pem.h>
+ 
+ #include <assert.h>
++#include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <stdbool.h>
+ 
+ #include "utils.h"
+ 
++/* The keyfile is read/written through memory BIOs, so this also works with OpenSSL
++ * builds configured with OPENSSL_NO_STDIO (as for UWP), which lack BIO_new_fp(). */
++#define KEYFILE_MAX_SIZE 8192
++
++static EVP_PKEY *read_private_key_file(const char *keyfile) {
++    EVP_PKEY *pkey = NULL;
++    char *buf = NULL;
++    FILE *file = fopen(keyfile, "rb");
++    if (!file) {
++        return NULL;
++    }
++    buf = (char *) malloc(KEYFILE_MAX_SIZE);
++    if (buf) {
++        size_t len = fread(buf, 1, KEYFILE_MAX_SIZE, file);
++        if (len > 0) {
++            BIO *bp = BIO_new_mem_buf(buf, (int) len);
++            if (bp) {
++                pkey = PEM_read_bio_PrivateKey(bp, NULL, NULL, NULL);
++                BIO_free(bp);
++            }
++        }
++        free(buf);
++    }
++    fclose(file);
++    return pkey;
++}
++
++static int write_private_key_file(const char *keyfile, EVP_PKEY *pkey) {
++    int ret = 0;
++    BIO *bp = BIO_new(BIO_s_mem());
++    if (!bp) {
++        return 0;
++    }
++    if (PEM_write_bio_PrivateKey(bp, pkey, NULL, NULL, 0, NULL, NULL)) {
++        char *data = NULL;
++        long len = BIO_get_mem_data(bp, &data);
++        FILE *file = fopen(keyfile, "wb");
++        if (file) {
++            ret = (len > 0 && fwrite(data, 1, (size_t) len, file) == (size_t) len);
++            fclose(file);
++        }
++    }
++    BIO_free(bp);
++    return ret;
++}
++
+ #define SALT_PK "UxPlay-Persistent-Not-Secure-Public-Key"
+ 
+ struct aes_ctx_s {
+@@ -350,8 +397,6 @@
+ 
+ ed25519_key_t *ed25519_key_generate(const char *device_id, const char *keyfile, int *result) {
+     EVP_PKEY_CTX *pctx = NULL;
+-    BIO *bp = NULL;
+-    FILE *file = NULL;
+     bool new_pk = false;
+     bool use_keyfile = strlen(keyfile);
+ 
+@@ -359,18 +404,10 @@
+ 
+     ed25519_key_t *key = (ed25519_key_t *) calloc(1, sizeof(ed25519_key_t));
+     assert(key);
+-   
++
+     if (use_keyfile) {
+-        file = fopen(keyfile, "r");
+-        if (file) {
+-            bp = BIO_new_fp(file, BIO_NOCLOSE);
+-            key->pkey = PEM_read_PrivateKey(file, NULL, NULL, NULL);
+-            BIO_free(bp);
+-            fclose(file);
+-            if (!key->pkey) {
+-                new_pk = true;
+-            }
+-        } else {
++        key->pkey = read_private_key_file(keyfile);
++        if (!key->pkey) {
+             new_pk = true;
+         }
+     } else {
+@@ -397,15 +434,8 @@
+             handle_error(__func__);
+         }
+         EVP_PKEY_CTX_free(pctx);
+-        if (use_keyfile) {
+-            file = fopen(keyfile, "w");
+-            if (file) {
+-                bp = BIO_new_fp(file, BIO_NOCLOSE);
+-                PEM_write_bio_PrivateKey(bp, key->pkey, NULL, NULL, 0, NULL, NULL);
+-                BIO_free(bp);
+-                fclose(file);
+-                *result = 1;
+-            }
++        if (use_keyfile && write_private_key_file(keyfile, key->pkey)) {
++            *result = 1;
+         }
+     }
+     return key;
+diff -ru --strip-trailing-cr -x CMakeLists.txt -x dns_sd third_party/UxPlay/lib/fairplay_playfair.c src/airplay/fairplay_playfair.c
+--- third_party/UxPlay/lib/fairplay_playfair.c	2026-10-17 05:52:09.586050000 -0400
++++ src/airplay/fairplay_playfair.c	2026-10-17 06:20:23.887210000 -0400
+@@ -56,6 +56,10 @@
+     }
+ 
+     int mode = req[14];
++    if (mode < 0 || mode > 3) {
++        /* only four reply messages exist; reject instead of reading past the table */
++        return -1;
++    }
+     memcpy(res, reply_message[mode], 142);
+     fp->keymsglen = 0;
+     return 0;
+diff -ru --strip-trailing-cr -x CMakeLists.txt -x dns_sd third_party/UxPlay/lib/httpd.c src/airplay/httpd.c
+--- third_party/UxPlay/lib/httpd.c	2026-10-17 05:52:09.589021000 -0400
++++ src/airplay/httpd.c	2026-10-17 07:19:55.339878300 -0400
+@@ -481,7 +481,10 @@
+                 connection->request = http_request_init();
+                 assert(connection->request);
+                 if (connection->type == CONNECTION_TYPE_PTTH) {
+-                    http_request_is_reverse(connection->request);
++                    /* everything the client sends on a reversed (PTTH) connection is a response to
++                       one of our POST /event requests: mark it so it is not parsed as a request
++                       (the 8-byte "HTTP/1.1" check below only runs once per connection) */
++                    http_request_set_reverse(connection->request);
+                 }
+                 logger_log(httpd->logger, LOGGER_DEBUG, "new request, connection %d, socket %d type %s",
+                            i, connection->socket_fd, typename [connection->type]);
+diff -ru --strip-trailing-cr -x CMakeLists.txt -x dns_sd third_party/UxPlay/lib/mdnsd/dnssd_mdnsd.c src/airplay/mdnsd/dnssd_mdnsd.c
+--- third_party/UxPlay/lib/mdnsd/dnssd_mdnsd.c	2026-10-17 05:52:09.589351500 -0400
++++ src/airplay/mdnsd/dnssd_mdnsd.c	2026-10-17 06:58:48.329568700 -0400
+@@ -68,7 +68,12 @@
+     }
+     host[sizeof(host) - 1] = '\0';
+     dnssd_sanitize_label(host);
++#ifdef AIRSERVER_UWP
++    /* use a host name the console's own mDNS responder does not also answer for */
++    snprintf(dst, dst_len, "%s-AirPlay.local", host);
++#else
+     snprintf(dst, dst_len, "%s.local", host);
++#endif
+ }
+ 
+ static int dnssd_prepare_names(dnssd_private_t *dnssd, dnssd_t *dnssd_public)
+@@ -356,3 +361,4 @@
+         printf("Socket error %d: %s\n", sock_err, SOCKET_ERROR_STRING(sock_err));
+     }
+ }
++
+diff -ru --strip-trailing-cr -x CMakeLists.txt -x dns_sd third_party/UxPlay/lib/mdnsd/mdnsd.c src/airplay/mdnsd/mdnsd.c
+--- third_party/UxPlay/lib/mdnsd/mdnsd.c	2026-10-17 05:52:09.589351500 -0400
++++ src/airplay/mdnsd/mdnsd.c	2026-10-17 06:16:06.684385300 -0400
+@@ -370,26 +370,52 @@
+     if (dwRetVal == NO_ERROR) {
+         PIP_ADAPTER_ADDRESSES pCurr = pAddresses;
+         while (pCurr) {
+-            // Precise target filters to bypass the Hyper-V virtual adapter loopback capture
+-            if (pCurr->OperStatus == IfOperStatusUp && 
++            // Precise target filters to bypass the Hyper-V virtual adapter loopback capture.
++            // (Do not reject every "Virtual" adapter: on Xbox the real Wi-Fi/Ethernet
++            //  adapters are named "Durango Virtual Network ... Adapter".)
++            if (pCurr->OperStatus == IfOperStatusUp &&
+                 pCurr->IfType != IF_TYPE_SOFTWARE_LOOPBACK &&
+-                pCurr->FirstGatewayAddress != NULL && 
++                pCurr->FirstGatewayAddress != NULL &&
+                 wcsstr(pCurr->Description, L"Hyper-V") == NULL &&
+-                wcsstr(pCurr->Description, L"Virtual") == NULL &&
++                (wcsstr(pCurr->Description, L"Virtual") == NULL || wcsstr(pCurr->Description, L"Durango") != NULL) &&
+                 wcsstr(pCurr->Description, L"WSL") == NULL &&
+                 wcsstr(pCurr->Description, L"vEthernet") == NULL) {
+-                
+-                if (pCurr->FirstUnicastAddress != NULL) {
+-                    struct sockaddr_in *sockaddr_ipv4 = (struct sockaddr_in *)pCurr->FirstUnicastAddress->Address.lpSockaddr;
+-                    addr = sockaddr_ipv4->sin_addr.s_addr;
+-                    break; 
++
++                PIP_ADAPTER_UNICAST_ADDRESS uni = pCurr->FirstUnicastAddress;
++                for (; uni != NULL; uni = uni->Next) {
++                    struct sockaddr_in *sockaddr_ipv4 = (struct sockaddr_in *)uni->Address.lpSockaddr;
++                    if (sockaddr_ipv4->sin_family == AF_INET && sockaddr_ipv4->sin_addr.s_addr != 0) {
++                        addr = sockaddr_ipv4->sin_addr.s_addr;
++                        break;
++                    }
++                }
++                if (addr) {
++                    break;
+                 }
+             }
+             pCurr = pCurr->Next;
+         }
+     }
+     free(pAddresses);
+-#else    
++    if (!addr) {
++        /* fallback: let the routing table pick the interface used for mDNS multicast */
++        SOCKET fd = socket(AF_INET, SOCK_DGRAM, 0);
++        if (fd != INVALID_SOCKET) {
++            struct sockaddr_in remote;
++            struct sockaddr_in local;
++            int local_len = sizeof(local);
++            memset(&remote, 0, sizeof(remote));
++            remote.sin_family = AF_INET;
++            remote.sin_port = htons(MDNS_PORT);
++            inet_pton(AF_INET, MDNS_ADDR4, &remote.sin_addr);
++            if (connect(fd, (struct sockaddr *) &remote, sizeof(remote)) == 0 &&
++                getsockname(fd, (struct sockaddr *) &local, &local_len) == 0) {
++                addr = local.sin_addr.s_addr;
++            }
++            closesocket(fd);
++        }
++    }
++#else
+     int fd;
+     struct sockaddr_in remote;
+     struct sockaddr_in local;
+diff -ru --strip-trailing-cr -x CMakeLists.txt -x dns_sd third_party/UxPlay/lib/raop.c src/airplay/raop.c
+--- third_party/UxPlay/lib/raop.c	2026-10-17 05:52:09.597974800 -0400
++++ src/airplay/raop.c	2026-10-17 14:42:24.167821200 -0400
+@@ -899,3 +899,77 @@
+     }
+     return codec_string[codec];
+ }
++
++/* Returns a malloc'ed, null-terminated copy of an HLS playlist collected from the client:
++ * path "/master.m3u8" gives the (adjusted) master playlist, any other path the media playlist
++ * listed under it, with YouTube's condensed URIs expanded. This is the content http_handler_hls
++ * serves on the local HLS channel; a player that cannot reach that channel over loopback (UWP)
++ * can fetch it directly with this call. Returns NULL if no HLS video is current or the path is
++ * unknown. */
++char *
++raop_get_hls_playlist(raop_t *raop, const char *path, int *len) {
++    assert(raop);
++    assert(path);
++    if (len) *len = 0;
++    if (raop->current_video < 0 || !raop->airplay_video[raop->current_video]) {
++        return NULL;
++    }
++    airplay_video_t *airplay_video = raop->airplay_video[raop->current_video];
++    char *data = NULL;
++    if (!strcmp(path, "/master.m3u8")) {
++        char *master_playlist = get_master_playlist(airplay_video);
++        if (master_playlist) {
++            data = strdup(master_playlist);
++        }
++    } else {
++        int chunks = 0;
++        float duration = 0.0f;
++        char *media_playlist = get_media_playlist(airplay_video, &chunks, &duration, path);
++        if (media_playlist) {
++            data = adjust_yt_condensed_playlist(media_playlist, chunks);
++        }
++    }
++    if (data && len) {
++        *len = (int) strlen(data);
++    }
++    return data;
++}
++
++/* Sends a video playback state event to the client over the reverse (PTTH) connection, as an Apple
++ * TV does: POST /event with a plist {category: video, sessionID, state}. state is "loading",
++ * "playing", "paused" or "stopped"; "stopped" tells the client that the current item has ended (the
++ * YouTube app then moves on, e.g. from an advertisement to the video). Returns 0 if it was sent. */
++int
++raop_send_video_event(raop_t *raop, const char *state) {
++    assert(raop);
++    assert(state);
++    if (raop->current_video < 0 || !raop->airplay_video[raop->current_video]) {
++        return -1;
++    }
++    const char *session_id = get_apple_session_id(raop->airplay_video[raop->current_video]);
++    int socket_fd = httpd_get_connection_socket_by_type(raop->httpd, CONNECTION_TYPE_PTTH, 1);
++    if (!session_id || socket_fd <= 0) {
++        return -1;
++    }
++    plist_t root = plist_new_dict();
++    plist_dict_set_item(root, "category", plist_new_string("video"));
++    plist_dict_set_item(root, "sessionID", plist_new_uint(1));  /* as in the FCUP requests */
++    plist_dict_set_item(root, "state", plist_new_string(state));
++    char *plist_xml = NULL;
++    uint32_t xml_len = 0;
++    plist_to_xml(root, &plist_xml, &xml_len);
++    plist_free(root);
++
++    http_response_t *request = http_response_create();
++    http_response_reverse_request_init(request, "POST", "/event", "HTTP/1.1");
++    http_response_add_header(request, "X-Apple-Session-ID", session_id);
++    http_response_add_header(request, "Content-Type", "text/x-apple-plist+xml");
++    http_response_finish(request, plist_xml, (int) xml_len);
++    plist_mem_free(plist_xml);
++    int request_len = 0;
++    const char *data = http_response_get_data(request, &request_len);
++    int sent = send(socket_fd, data, request_len, 0);
++    http_response_destroy(request);
++    logger_log(raop->logger, LOGGER_INFO, "video event \"%s\" sent to the client (%d bytes)", state, sent);
++    return sent == request_len ? 0 : -1;
++}
+diff -ru --strip-trailing-cr -x CMakeLists.txt -x dns_sd third_party/UxPlay/lib/raop.h src/airplay/raop.h
+--- third_party/UxPlay/lib/raop.h	2026-10-17 05:52:09.597974800 -0400
++++ src/airplay/raop.h	2026-10-17 14:42:30.234067600 -0400
+@@ -158,6 +158,8 @@
+ RAOP_API void raop_remove_hls_connections(raop_t * raop);
+ RAOP_API void raop_destroy_airplay_video(raop_t *raop, int id);
+ RAOP_API void raop_playlist_remove(raop_t *raop, void *airplay_video, float position);
++RAOP_API char *raop_get_hls_playlist(raop_t *raop, const char *path, int *len);
++RAOP_API int raop_send_video_event(raop_t *raop, const char *state);
+ #ifdef __cplusplus
+ }
+ #endif
+diff -ru --strip-trailing-cr -x CMakeLists.txt -x dns_sd third_party/UxPlay/lib/raop_ntp.c src/airplay/raop_ntp.c
+--- third_party/UxPlay/lib/raop_ntp.c	2026-10-17 05:52:09.597974800 -0400
++++ src/airplay/raop_ntp.c	2026-10-17 06:16:10.776243600 -0400
+@@ -110,6 +110,11 @@
+ 
+ /* code for recv with kernel timestamp */
+ 
++#ifdef AIRSERVER_UWP
++/* kernel receive timestamps (WSAIoctl SIO_TIMESTAMPING, GetIfEntry2) are not used in the UWP build */
++#undef SIO_TIMESTAMPING
++#endif
++
+ #ifdef _WIN32
+ #ifndef WSA_CMSG_SPACE
+ #define WSA_CMSG_SPACE(len) (sizeof(struct cmsghdr) + (len))
+diff -ru --strip-trailing-cr -x CMakeLists.txt -x dns_sd third_party/UxPlay/lib/raop_rtp_mirror.c src/airplay/raop_rtp_mirror.c
+--- third_party/UxPlay/lib/raop_rtp_mirror.c	2026-10-17 05:52:09.605686700 -0400
++++ src/airplay/raop_rtp_mirror.c	2026-10-17 06:17:34.510747800 -0400
+@@ -50,7 +50,8 @@
+ #define SEC SECOND_IN_NSECS
+ 
+ /* for MacOS, where SOL_TCP and TCP_KEEPIDLE are not defined */
+-#if !defined(SOL_TCP) && defined(IPPROTO_TCP)
++/* (on Windows IPPROTO_TCP is an enum constant, not a macro) */
++#if !defined(SOL_TCP) && (defined(IPPROTO_TCP) || defined(_WIN32))
+ #define SOL_TCP IPPROTO_TCP
+ #endif
+ #if !defined(TCP_KEEPIDLE) && defined(TCP_KEEPALIVE)
+@@ -99,6 +100,7 @@
+ 
+     /* MUTEX LOCKED VARIABLES END */
+     int mirror_data_sock;
++    int stream_fd;   /* accepted mirror stream socket, -1 if none (guarded by run_mutex) */
+ 
+     unsigned short mirror_data_lport;
+ 
+@@ -156,6 +158,8 @@
+     raop_rtp_mirror->running = 0;
+     raop_rtp_mirror->joined = 1;
+     raop_rtp_mirror->flush = NO_FLUSH;
++    raop_rtp_mirror->mirror_data_sock = -1;
++    raop_rtp_mirror->stream_fd = -1;
+ 
+     MUTEX_CREATE(raop_rtp_mirror->run_mutex);
+     return raop_rtp_mirror;
+@@ -250,6 +254,11 @@
+                            "raop_rtp_mirror error in accept %d %s", sock_err, SOCKET_ERROR_STRING(sock_err));
+                 break;
+             }
++            /* published so raop_rtp_mirror_stop() can unblock a recv() on it
++               (on Windows SO_RCVTIMEO takes a DWORD, so the timeval below means "no timeout") */
++            MUTEX_LOCK(raop_rtp_mirror->run_mutex);
++            raop_rtp_mirror->stream_fd = stream_fd;
++            MUTEX_UNLOCK(raop_rtp_mirror->run_mutex);
+ 
+             // We're calling recv for a certain amount of data, so we need a timeout
+             struct timeval tv;
+@@ -306,6 +315,10 @@
+                 logger_log(raop_rtp_mirror->logger, LOGGER_DEBUG,
+                            "raop_rtp_mirror tcp socket was closed by client (recv returned 0); got %d bytes of 128 byte header",readstart);
+                 FD_CLR(stream_fd, &rfds);
++                MUTEX_LOCK(raop_rtp_mirror->run_mutex);
++                CLOSESOCKET(stream_fd);
++                raop_rtp_mirror->stream_fd = -1;
++                MUTEX_UNLOCK(raop_rtp_mirror->run_mutex);
+                 stream_fd = -1;
+                 continue;
+             } else if (payload == NULL && ret == -1) {
+@@ -833,9 +846,12 @@
+         }
+     }
+     /* Close the stream file descriptor */
++    MUTEX_LOCK(raop_rtp_mirror->run_mutex);
+     if (stream_fd != -1) {
+         CLOSESOCKET(stream_fd);
+     }
++    raop_rtp_mirror->stream_fd = -1;
++    MUTEX_UNLOCK(raop_rtp_mirror->run_mutex);
+ 
+     // Ensure running reflects the actual state
+     MUTEX_LOCK(raop_rtp_mirror->run_mutex);
+@@ -941,6 +957,10 @@
+         return;
+     }
+     raop_rtp_mirror->running = 0;
++    if (raop_rtp_mirror->stream_fd != -1) {
++        /* wake the mirror thread if it is blocked in recv() */
++        shutdown(raop_rtp_mirror->stream_fd, SHUT_RDWR);
++    }
+     MUTEX_UNLOCK(raop_rtp_mirror->run_mutex);
+ 
+     /* Join the thread */
+diff -ru --strip-trailing-cr -x CMakeLists.txt -x dns_sd third_party/UxPlay/lib/srp.c src/airplay/srp.c
+--- third_party/UxPlay/lib/srp.c	2026-10-17 05:52:09.606210700 -0400
++++ src/airplay/srp.c	2026-10-17 06:15:47.026342300 -0400
+@@ -591,7 +591,13 @@
+ #endif
+     unsigned char buff[64];
+ 
+-#ifdef WIN32
++#if defined(WIN32) && defined(AIRSERVER_UWP)
++        /* legacy CryptoAPI is not available to UWP apps; OpenSSL seeds itself from BCryptGenRandom */
++        (void) wctx;
++        if (RAND_bytes(buff, sizeof(buff)) == 1) {
++            g_initialized = 1;
++        }
++#elif defined(WIN32)
+         CryptAcquireContext(&wctx, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT);
+         CryptGenRandom(wctx, sizeof(buff), (BYTE*) buff);
+         CryptReleaseContext(wctx, 0);

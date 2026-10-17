@@ -1,0 +1,22 @@
+# build output (also holds test screenshots and Xbox logs)
+build/
+
+# vcpkg: tool checkout is a submodule; installed packages, caches and logs are local
+tools/vcpkg_installed/
+tools/vcpkg-cache/
+tools/vcpkg-reg-cache/
+tools/logs/
+
+# package signing keys (generate your own with tools/make-test-cert.sh)
+*.pfx
+
+# per-machine settings
+tools/xbox-address.txt
+
+# Visual Studio / MSBuild
+.vs/
+*.user
+*.VC.db
+*.VC.opendb
+src/app/Generated Files/
+src/app/BundleArtifacts/
