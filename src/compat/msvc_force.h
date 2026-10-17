@@ -1,6 +1,6 @@
 /* Force-included (/FI) into every UxPlay C file when building with MSVC. */
-#ifndef AIRSERVER_FORCE_H
-#define AIRSERVER_FORCE_H
+#ifndef MSVC_FORCE_H
+#define MSVC_FORCE_H
 #include <BaseTsd.h>
 #ifndef _SSIZE_T_DEFINED
 #define _SSIZE_T_DEFINED

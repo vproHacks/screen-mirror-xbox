@@ -31,7 +31,7 @@ it at once); see TODO in `docs/DEVLOG.md`.
 - **Developer Mode**: build the sideload package (below) and install it with
   `tools/deploy.sh`, or in a browser through Xbox Device Portal
   (`https://<xbox-ip>:11443` → *Home → Add*: the `.msix` from
-  `build/AppPackages/AirServerXbox_<version>_x64_Test/` plus
+  `build/AppPackages/ScreenMirrorServer_<version>_x64_Test/` plus
   `Dependencies/x64/Microsoft.VCLibs.x64.14.00.appx`). An Xbox profile must be signed in to launch it.
 
 ## Settings
@@ -78,6 +78,9 @@ reserve a name, copy the identity from *Product identity* into `src/app/Package.
 build with `tools/build-store.cmd`, and submit with *Private audience* visibility, category
 *Utilities & tools*, Xbox as the device family, and `PRIVACY.md` as the privacy policy URL. Tell
 the certification testers how to try it (an iPhone on the same network → Screen Mirroring).
+`docs/store/listing.md` has the text for every Store listing field, and `docs/store/art` the
+listing images (made by `tools/store/make-store-art.ps1` from the app's mark in `tools/glyph.ps1`,
+which `tools/make-assets.ps1` also uses for the package tiles).
 
 ## Testing without an iPhone
 
@@ -115,7 +118,9 @@ a Dev Mode console with media generated for the project (see `tools/demo/`).
 - `third_party/UxPlay`: upstream UxPlay (submodule)
 - `test/fakesender/`: the test sender; `test/h264sps/`, `test/hlsaudio/`: checks of the H.264 header
   rewrite and the packed-audio conversion against FFmpeg (`build/tests/*_test.exe`)
-- `tools/`: build, dependency, deployment and Device Portal scripts; `tools/demo/`: screenshot media
+- `tools/`: build, dependency, deployment and Device Portal scripts; `tools/demo/`: screenshot media;
+  `tools/store/`: Store listing art
+- `docs/store/`: Store listing text and art
 - `docs/DEVLOG.md`: how it was built and tested, and what changed in UxPlay's code
 
 ## License

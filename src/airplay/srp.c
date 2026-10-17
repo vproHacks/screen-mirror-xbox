@@ -591,7 +591,7 @@ static void init_random()
 #endif
     unsigned char buff[64];
 
-#if defined(WIN32) && defined(AIRSERVER_UWP)
+#if defined(WIN32) && defined(SCREEN_MIRROR_UWP)
         /* legacy CryptoAPI is not available to UWP apps; OpenSSL seeds itself from BCryptGenRandom */
         (void) wctx;
         if (RAND_bytes(buff, sizeof(buff)) == 1) {

@@ -138,3 +138,11 @@ a long speaker session after the decoder change (see the log below), and casting
   locked); 2 minutes of silence after the video is over or failed to load still ends the session.
 - A cast item that plays to its end is reported as paused at its end and announced with a
   "stopped" event instead of ending the session (see TODO for the ad → video transition).
+- Renamed the build to the product: project `ScreenMirrorServer.vcxproj`, so the executable, map
+  and packages are `ScreenMirrorServer*`; manifest entry point `ScreenMirrorServer.App`; the UWP
+  build macro is `SCREEN_MIRROR_UWP` and the compat header `msvc_force.h`.
+- The app icon was a screen outline with a triangle, which is Apple's AirPlay symbol; the mark is
+  now a TV showing a phone (`tools/glyph.ps1`), for the package tiles and the Store listing art.
+- `tools/make-test-cert.sh` gave the native openssl.exe Unix temp paths (it failed silently), and
+  its certificate became "not yet valid" when the PC clock was corrected back by ~3 hours; it now
+  passes Windows paths and dates the certificate from the day before.

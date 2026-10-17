@@ -68,7 +68,7 @@ static void dnssd_make_host_name(char *dst, size_t dst_len)
     }
     host[sizeof(host) - 1] = '\0';
     dnssd_sanitize_label(host);
-#ifdef AIRSERVER_UWP
+#ifdef SCREEN_MIRROR_UWP
     /* use a host name the console's own mDNS responder does not also answer for */
     snprintf(dst, dst_len, "%s-AirPlay.local", host);
 #else

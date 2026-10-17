@@ -2,8 +2,8 @@
 <Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Label="Globals">
     <ProjectGuid>{6F2A8C1E-3B5D-4E7A-9C41-2D8E5F0B7A63}</ProjectGuid>
-    <RootNamespace>AirServerXbox</RootNamespace>
-    <ProjectName>AirServerXbox</ProjectName>
+    <RootNamespace>ScreenMirrorServer</RootNamespace>
+    <ProjectName>ScreenMirrorServer</ProjectName>
     <DefaultLanguage>en-US</DefaultLanguage>
     <MinimumVisualStudioVersion>17.0</MinimumVisualStudioVersion>
     <AppContainerApplication>true</AppContainerApplication>
@@ -63,7 +63,7 @@
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>false</SDLCheck>
       <AdditionalOptions>/bigobj /utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <PreprocessorDefinitions>WIN32;AIRSERVER_UWP;_WIN32_WINNT=0x0A00;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;SCREEN_MIRROR_UWP;_WIN32_WINNT=0x0A00;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory);$(RepoRoot)src\airplay;$(RepoRoot)src\compat;$(VcpkgUwp)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -133,7 +133,7 @@
       <CompileAs>CompileAsC</CompileAs>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <ConformanceMode>false</ConformanceMode>
-      <ForcedIncludeFiles>airserver_force.h</ForcedIncludeFiles>
+      <ForcedIncludeFiles>msvc_force.h</ForcedIncludeFiles>
       <PreprocessorDefinitions>NOHOLD;PLIST_210;PLIST_230;OPENSSL_API_COMPAT=0x10101000L;_CRT_NONSTDC_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <UndefinePreprocessorDefinitions>UNICODE;_UNICODE</UndefinePreprocessorDefinitions>
       <DisableSpecificWarnings>4018;4101;4146;4244;4267;4305;4996</DisableSpecificWarnings>

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Turns the "exe+0x<RVA>" addresses of a CRASH line in airplay.log into function names, using the
 # linker map of the build that crashed (the map changes with every build).
-# Usage: tools/symbolize.sh [-m build/x64/Release/AirServerXbox.map] exe+0x133319 exe+0x2a10 ...
+# Usage: tools/symbolize.sh [-m build/x64/Release/ScreenMirrorServer.map] exe+0x133319 exe+0x2a10 ...
 #    or: tools/xbox.sh log | grep CRASH | tools/symbolize.sh
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-MAP="$ROOT/build/x64/Release/AirServerXbox.map"
+MAP="$ROOT/build/x64/Release/ScreenMirrorServer.map"
 if [ "$1" = "-m" ]; then MAP="$2"; shift 2; fi
 [ -f "$MAP" ] || { echo "no map file: $MAP"; exit 1; }
 if [ $# -gt 0 ]; then input="$*"; else input="$(cat)"; fi

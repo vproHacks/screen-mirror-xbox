@@ -155,12 +155,12 @@ diff -ru --strip-trailing-cr -x CMakeLists.txt -x dns_sd third_party/UxPlay/lib/
                             i, connection->socket_fd, typename [connection->type]);
 diff -ru --strip-trailing-cr -x CMakeLists.txt -x dns_sd third_party/UxPlay/lib/mdnsd/dnssd_mdnsd.c src/airplay/mdnsd/dnssd_mdnsd.c
 --- third_party/UxPlay/lib/mdnsd/dnssd_mdnsd.c	2026-10-17 05:52:09.589351500 -0400
-+++ src/airplay/mdnsd/dnssd_mdnsd.c	2026-10-17 06:58:48.329568700 -0400
++++ src/airplay/mdnsd/dnssd_mdnsd.c	2026-10-17 11:01:32.374701400 -0400
 @@ -68,7 +68,12 @@
      }
      host[sizeof(host) - 1] = '\0';
      dnssd_sanitize_label(host);
-+#ifdef AIRSERVER_UWP
++#ifdef SCREEN_MIRROR_UWP
 +    /* use a host name the console's own mDNS responder does not also answer for */
 +    snprintf(dst, dst_len, "%s-AirPlay.local", host);
 +#else
@@ -335,12 +335,12 @@ diff -ru --strip-trailing-cr -x CMakeLists.txt -x dns_sd third_party/UxPlay/lib/
  #endif
 diff -ru --strip-trailing-cr -x CMakeLists.txt -x dns_sd third_party/UxPlay/lib/raop_ntp.c src/airplay/raop_ntp.c
 --- third_party/UxPlay/lib/raop_ntp.c	2026-10-17 05:52:09.597974800 -0400
-+++ src/airplay/raop_ntp.c	2026-10-17 06:16:10.776243600 -0400
++++ src/airplay/raop_ntp.c	2026-10-17 11:01:32.399082100 -0400
 @@ -110,6 +110,11 @@
  
  /* code for recv with kernel timestamp */
  
-+#ifdef AIRSERVER_UWP
++#ifdef SCREEN_MIRROR_UWP
 +/* kernel receive timestamps (WSAIoctl SIO_TIMESTAMPING, GetIfEntry2) are not used in the UWP build */
 +#undef SIO_TIMESTAMPING
 +#endif
@@ -427,13 +427,13 @@ diff -ru --strip-trailing-cr -x CMakeLists.txt -x dns_sd third_party/UxPlay/lib/
      /* Join the thread */
 diff -ru --strip-trailing-cr -x CMakeLists.txt -x dns_sd third_party/UxPlay/lib/srp.c src/airplay/srp.c
 --- third_party/UxPlay/lib/srp.c	2026-10-17 05:52:09.606210700 -0400
-+++ src/airplay/srp.c	2026-10-17 06:15:47.026342300 -0400
++++ src/airplay/srp.c	2026-10-17 11:01:32.391217700 -0400
 @@ -591,7 +591,13 @@
  #endif
      unsigned char buff[64];
  
 -#ifdef WIN32
-+#if defined(WIN32) && defined(AIRSERVER_UWP)
++#if defined(WIN32) && defined(SCREEN_MIRROR_UWP)
 +        /* legacy CryptoAPI is not available to UWP apps; OpenSSL seeds itself from BCryptGenRandom */
 +        (void) wctx;
 +        if (RAND_bytes(buff, sizeof(buff)) == 1) {

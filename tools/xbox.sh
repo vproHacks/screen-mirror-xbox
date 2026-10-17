@@ -3,7 +3,7 @@
 # Usage: tools/xbox.sh <command> [args]
 #   info                      OS info
 #   install [msix]            upload + install the app package (with the VCLibs dependency)
-#   state                     installed AirServerXbox package(s)
+#   state                     installed Screen Mirror Server package(s)
 #   launch | stop             start / terminate the app
 #   running                   is the app process running?
 #   log [file]                print a file from the app's LocalState (default airplay.log)
@@ -38,7 +38,7 @@ cmd="${1:-info}"; shift || true
 case "$cmd" in
   info) c "$XBOX/api/os/info"; echo ;;
   install)
-    MSIX="${1:-$(ls -t "$ROOT"/build/AppPackages/*/AirServerXbox_*_x64.msix | head -1)}"
+    MSIX="${1:-$(ls -t "$ROOT"/build/AppPackages/*/ScreenMirrorServer_*_x64.msix | head -1)}"
     DEP="$(dirname "$MSIX")/Dependencies/x64/Microsoft.VCLibs.x64.14.00.appx"
     T=$(csrf)
     echo "installing $(basename "$MSIX") (+ $(basename "$DEP"))"
@@ -60,7 +60,7 @@ case "$cmd" in
     FN=$(full_name); T=$(csrf)
     c -X DELETE -H "X-CSRF-Token: $T" -w "HTTP %{http_code}\n" "$XBOX/api/taskmanager/app?package=$(urlenc "$(b64 "$FN")")" ;;
   running)
-    c "$XBOX/api/resourcemanager/processes" | tr '{' '\n' | grep -i "AirServerXbox" | sed -n 's/.*"ImageName" : "\([^"]*\)".*"PrivateWorkingSet" : \([0-9]*\).*/\1 private=\2/p; s/.*"ImageName" : "\([^"]*\)".*/\1/p' | head -3 ;;
+    c "$XBOX/api/resourcemanager/processes" | tr '{' '\n' | grep -i "ScreenMirrorServer" | sed -n 's/.*"ImageName" : "\([^"]*\)".*"PrivateWorkingSet" : \([0-9]*\).*/\1 private=\2/p; s/.*"ImageName" : "\([^"]*\)".*/\1/p' | head -3 ;;
   log)
     FN=$(full_name); F="${1:-airplay.log}"
     c "$XBOX/api/filesystem/apps/file?knownfolderid=LocalAppData&packagefullname=$FN&filename=$F&path=%5CLocalState" ;;

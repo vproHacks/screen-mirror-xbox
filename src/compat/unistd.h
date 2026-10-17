@@ -1,6 +1,6 @@
 /* Minimal unistd.h for MSVC / UWP (only what the UxPlay library uses). */
-#ifndef AIRSERVER_COMPAT_UNISTD_H
-#define AIRSERVER_COMPAT_UNISTD_H
+#ifndef COMPAT_UNISTD_H
+#define COMPAT_UNISTD_H
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN

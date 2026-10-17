@@ -8,7 +8,7 @@
 #include <cstdio>
 #include <random>
 
-#include "airserver_force.h"
+#include "msvc_force.h"
 extern "C" {
 #include "raop.h"
 #include "dnssd.h"

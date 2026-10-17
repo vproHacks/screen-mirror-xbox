@@ -18,7 +18,7 @@ namespace Log
     // Writes crashes to the log: a native exception nobody handles, std::terminate (an exception
     // escaping a thread or a fire_and_forget coroutine), abort() and CRT parameter errors. Code
     // addresses are logged as "exe+0x<RVA>", to look up in the linker map
-    // (build\x64\<config>\AirServerXbox.map). Fail-fast exits (heap corruption, /GS) bypass this.
+    // (build\x64\<config>\ScreenMirrorServer.map). Fail-fast exits (heap corruption, /GS) bypass this.
     void InstallCrashHandlers();
 }
 

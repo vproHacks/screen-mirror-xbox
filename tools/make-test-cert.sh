@@ -9,10 +9,15 @@ PUBLISHER=$(grep -o 'Publisher="[^"]*"' "$MAN" | head -1 | sed 's/Publisher="\(.
 OUT="$ROOT/src/app/ScreenMirrorServer_TemporaryKey.pfx"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
-MSYS_NO_PATHCONV=1 openssl req -x509 -newkey rsa:2048 -keyout "$TMP/key.pem" -out "$TMP/cert.pem" -days 3650 -nodes \
-  -subj "/$PUBLISHER" -addext "extendedKeyUsage=codeSigning" -addext "basicConstraints=critical,CA:FALSE" \
-  -addext "keyUsage=critical,digitalSignature" 2>/dev/null
+T=$(cygpath -m "$TMP")  # openssl.exe is a Windows program: give it Windows paths
+# valid from yesterday, so that a clock correction cannot make it "not yet valid"
+FROM=$(date -u -d '1 day ago' +%Y%m%d%H%M%SZ)
+UNTIL=$(date -u -d '10 years' +%Y%m%d%H%M%SZ)
+MSYS_NO_PATHCONV=1 openssl req -x509 -newkey rsa:2048 -keyout "$T/key.pem" -out "$T/cert.pem" -nodes \
+  -not_before "$FROM" -not_after "$UNTIL" -subj "/$PUBLISHER" -addext "extendedKeyUsage=codeSigning" \
+  -addext "basicConstraints=critical,CA:FALSE" -addext "keyUsage=critical,digitalSignature" 2>"$T/req.log" ||
+  { cat "$T/req.log"; exit 1; }
 # 3DES/SHA1 PKCS#12 so that Windows' SignTool can read it
-openssl pkcs12 -export -out "$OUT" -inkey "$TMP/key.pem" -in "$TMP/cert.pem" -passout pass: \
+openssl pkcs12 -export -out "$OUT" -inkey "$T/key.pem" -in "$T/cert.pem" -passout pass: \
   -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1
 echo "created $OUT for $PUBLISHER"

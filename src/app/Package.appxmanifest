@@ -6,7 +6,7 @@
   IgnorableNamespaces="uap mp">
 
   <!-- Identity reserved in Partner Center (Product identity page) -->
-  <Identity Name="vpro8725.ScreenMirrorServer" Publisher="CN=D10B77AE-54C4-46E9-A4FE-56E07672A94E" Version="1.1.10.0" />
+  <Identity Name="vpro8725.ScreenMirrorServer" Publisher="CN=D10B77AE-54C4-46E9-A4FE-56E07672A94E" Version="1.1.13.0" />
 
   <mp:PhoneIdentity PhoneProductId="d46abcfd-9c2d-49fa-9ebf-60d1a7d69654" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
@@ -25,7 +25,7 @@
   </Resources>
 
   <Applications>
-    <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="AirServerXbox.App">
+    <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="ScreenMirrorServer.App">
       <uap:VisualElements
         DisplayName="Screen Mirror Server"
         Description="Receive screen mirroring, videos and music from an iPhone or iPad on the same network."

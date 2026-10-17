@@ -4,8 +4,8 @@
  * all-zero state is valid, so zero-initialized pthread_mutex_t objects (as in
  * calloc'ed structs that never call pthread_mutex_init) work.
  */
-#ifndef AIRSERVER_COMPAT_PTHREAD_H
-#define AIRSERVER_COMPAT_PTHREAD_H
+#ifndef COMPAT_PTHREAD_H
+#define COMPAT_PTHREAD_H
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -51,10 +51,10 @@ static __inline int clock_gettime(clockid_t clk, struct timespec *ts) {
     return timespec_get(ts, TIME_UTC) == TIME_UTC ? 0 : -1;
 }
 
-typedef struct { void *(*func)(void *); void *arg; } airserver_thread_start_t;
+typedef struct { void *(*func)(void *); void *arg; } compat_thread_start_t;
 
-static unsigned __stdcall airserver_thread_trampoline(void *p) {
-    airserver_thread_start_t start = *(airserver_thread_start_t *) p;
+static unsigned __stdcall compat_thread_trampoline(void *p) {
+    compat_thread_start_t start = *(compat_thread_start_t *) p;
     free(p);
     start.func(start.arg);
     return 0;
@@ -63,11 +63,11 @@ static unsigned __stdcall airserver_thread_trampoline(void *p) {
 static __inline int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
                                    void *(*func)(void *), void *arg) {
     (void) attr;
-    airserver_thread_start_t *start = (airserver_thread_start_t *) malloc(sizeof(*start));
+    compat_thread_start_t *start = (compat_thread_start_t *) malloc(sizeof(*start));
     if (!start) return ENOMEM;
     start->func = func;
     start->arg = arg;
-    uintptr_t h = _beginthreadex(NULL, 0, airserver_thread_trampoline, start, 0, NULL);
+    uintptr_t h = _beginthreadex(NULL, 0, compat_thread_trampoline, start, 0, NULL);
     if (!h) {
         free(start);
         return EAGAIN;

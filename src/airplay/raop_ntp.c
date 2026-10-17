@@ -110,7 +110,7 @@ struct raop_ntp_s {
 
 /* code for recv with kernel timestamp */
 
-#ifdef AIRSERVER_UWP
+#ifdef SCREEN_MIRROR_UWP
 /* kernel receive timestamps (WSAIoctl SIO_TIMESTAMPING, GetIfEntry2) are not used in the UWP build */
 #undef SIO_TIMESTAMPING
 #endif

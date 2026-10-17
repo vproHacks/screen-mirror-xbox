@@ -13,7 +13,7 @@ set CFLAGS=/nologo /c /O2 /MD /W3 /DWIN32 /D_WIN32_WINNT=0x0A00 /D_CRT_SECURE_NO
   /wd4018 /wd4101 /wd4146 /wd4244 /wd4267 /wd4305 /wd4996 ^
   /I"%R%\src\compat" /I"%R%\src\airplay" /I"%R%\src\airplay\playfair" /I"%R%\src\airplay\llhttp" /I"%DEPS%\include"
 
-cl %CFLAGS% /std:c17 /FI"%R%\src\compat\airserver_force.h" "%R%\src\airplay\*.c" "%R%\src\airplay\playfair\*.c" "%R%\src\airplay\llhttp\*.c" "%R%\src\airplay\mdnsd\*.c" || exit /b 1
+cl %CFLAGS% /std:c17 /FI"%R%\src\compat\msvc_force.h" "%R%\src\airplay\*.c" "%R%\src\airplay\playfair\*.c" "%R%\src\airplay\llhttp\*.c" "%R%\src\airplay\mdnsd\*.c" || exit /b 1
 cl %CFLAGS% /std:c++17 /EHsc /DNOMINMAX "%R%\test\fakesender\fakesender.cpp" || exit /b 1
 rem FFmpeg (avformat/avcodec/swresample) decodes audio files; it also pulls in the Media Foundation,
 rem Direct3D and Schannel system libraries it was configured with
