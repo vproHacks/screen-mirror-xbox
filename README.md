@@ -70,6 +70,16 @@ Files in the app's `LocalState` folder (Device Portal → File explorer → Loca
    `https://192.168.1.50:11443`) to use `tools/deploy.sh` (bump version, build, install, launch)
    and `tools/xbox.sh` (install, launch, logs, screenshots).
 
+## Releases
+
+GitHub releases are built by `.github/workflows/release.yml`: push a tag `vMAJOR.MINOR.BUILD`
+on the commit to ship, then run *Actions → Release → Run workflow* with that tag. It builds the
+sideload package (signed `.msix`, the VCLibs dependency and the signing certificate) and attaches
+it to the tag's release; the Store upload package is an artifact of the run. The package version
+comes from the tag (`v1.1.13` → 1.1.13.0). To sign every release with the same certificate, store
+a password-less PFX (subject = the manifest's Publisher) base64-encoded in the repository secret
+`SIDELOAD_PFX_BASE64`; otherwise each release gets a new self-signed certificate.
+
 ## Publishing (retail Xbox)
 
 Retail consoles only run Store apps. The app is published as a non-game UWP app through

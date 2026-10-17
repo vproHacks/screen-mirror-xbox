@@ -3,6 +3,7 @@
 #   app (UWP):          openssl, libplist, ffmpeg (libavcodec: AAC-ELD and ALAC decoders; LGPL build)
 #   test tools (Win32): openssl, libplist, openh264 (test video), ffmpeg (reads audio files)
 # Run from Git Bash after installing the VS 2022 Build Tools (UWP + C++ workloads).
+# --app-only: only the app's libraries (what the release build needs).
 set -e
 source "$(dirname "$0")/vcpkg-env.sh"
 cd "$VCPKG_ROOT"
@@ -24,7 +25,9 @@ run_vcpkg() {
   fi
 }
 
+APP_ONLY=0
+[ "${1:-}" = "--app-only" ] && APP_ONLY=1
 run_vcpkg openssl:x64-uwp-static-md libplist:x64-uwp-static-md "ffmpeg[core,avcodec]:x64-uwp-static-md"
-run_vcpkg openssl:x64-windows-static-md libplist:x64-windows-static-md openh264:x64-windows-static-md \
+[ $APP_ONLY = 1 ] || run_vcpkg openssl:x64-windows-static-md libplist:x64-windows-static-md openh264:x64-windows-static-md \
           "ffmpeg[core,avcodec,avformat,swresample]:x64-windows-static-md"
 echo "dependencies installed in tools/vcpkg_installed"

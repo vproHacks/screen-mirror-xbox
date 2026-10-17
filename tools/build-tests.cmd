@@ -1,7 +1,7 @@
 @echo off
 rem Builds the desktop test tools (fake iPhone sender) into build\tests\.
 setlocal
-call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat" -arch=x64 -no_logo || exit /b 1
+call "%~dp0vsenv.cmd" || exit /b 1
 set R=%~dp0..
 set DEPS=%R%\tools\vcpkg_installed\x64-windows-static-md
 set OUT=%R%\build\tests

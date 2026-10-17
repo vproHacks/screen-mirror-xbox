@@ -1,0 +1,148 @@
+name: Release
+
+# Builds the release files for a tag and publishes them as that tag's GitHub release:
+#   ScreenMirrorServer_<version>_x64.msix      the app, signed for sideloading (Xbox Dev Mode, Windows)
+#   Microsoft.VCLibs.x64.14.00.appx            the C++ runtime package it depends on
+#   ScreenMirrorServer_<version>.cer           the signing certificate (to trust on a Windows PC)
+#   SHA256SUMS.txt
+# The Store upload package (.msixupload) is kept as an artifact of the run, for Partner Center.
+#
+# To release: push a tag vMAJOR.MINOR.BUILD on the commit to ship, then Actions > Release >
+# Run workflow with that tag. The app version comes from the tag (v1.1.13 -> 1.1.13.0).
+# Signing: a repository secret SIDELOAD_PFX_BASE64 (a base64 PFX without password, subject equal to
+# the manifest's Publisher) keeps the same certificate across releases; without it, each release
+# gets a new self-signed certificate.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, already pushed (vMAJOR.MINOR.BUILD, e.g. v1.1.13)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.tag }}
+
+jobs:
+  release:
+    runs-on: windows-2025
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - name: Check the tag
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::the tag must look like v1.2.3, not '$TAG'"; exit 1; }
+          echo "VERSION=${TAG#v}.0" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v5
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          submodules: true
+
+      - name: Set the package version from the tag
+        run: |
+          sed -i "0,/Version=\"[0-9.]*\"/s//Version=\"$VERSION\"/" src/app/Package.appxmanifest
+          grep -o '<Identity[^>]*>' src/app/Package.appxmanifest
+
+      - name: Make sure the C++ UWP tools are installed
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -version "[17.0,18.0)" -property installationPath
+          $uwp = & $vswhere -latest -products * -version "[17.0,18.0)" -requires Microsoft.VisualStudio.ComponentGroup.UWP.VC -property installationPath
+          if ($uwp) { "C++ UWP tools present in $vs"; exit 0 }
+          "installing the C++ UWP tools into $vs"
+          $p = Start-Process "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe" -Wait -PassThru `
+            -ArgumentList "modify --installPath `"$vs`" --add Microsoft.VisualStudio.ComponentGroup.UWP.VC --quiet --norestart --nocache"
+          exit $p.ExitCode
+
+      - name: vcpkg cache key
+        id: vcpkg
+        run: echo "key=vcpkg-app-$(git -C tools/vcpkg rev-parse HEAD)-${{ hashFiles('tools/setup-deps.sh') }}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: tools/vcpkg-cache
+          key: ${{ steps.vcpkg.outputs.key }}
+
+      - name: Build the libraries with vcpkg (OpenSSL, libplist, FFmpeg)
+        run: bash tools/setup-deps.sh --app-only
+
+      - name: Signing certificate
+        env:
+          PFX_BASE64: ${{ secrets.SIDELOAD_PFX_BASE64 }}
+        run: |
+          if [ -n "$PFX_BASE64" ]; then
+            echo "$PFX_BASE64" | base64 -d > src/app/ScreenMirrorServer_TemporaryKey.pfx
+            echo "using the certificate from the SIDELOAD_PFX_BASE64 secret"
+          else
+            bash tools/make-test-cert.sh
+          fi
+          mkdir -p release
+          openssl pkcs12 -in src/app/ScreenMirrorServer_TemporaryKey.pfx -nokeys -passin pass: |
+            openssl x509 -outform der -out "release/ScreenMirrorServer_${VERSION}.cer"
+          openssl x509 -inform der -in "release/ScreenMirrorServer_${VERSION}.cer" -noout -subject -dates
+
+      - name: Build the sideload package
+        shell: cmd
+        run: tools\build-app.cmd Release
+
+      - name: Build the Store upload package
+        shell: cmd
+        run: tools\build-store.cmd
+
+      - name: Collect the release files
+        run: |
+          P="build/AppPackages/ScreenMirrorServer_${VERSION}_x64_Test"
+          cp "$P/ScreenMirrorServer_${VERSION}_x64.msix" release/
+          cp "$P/Dependencies/x64/Microsoft.VCLibs.x64.14.00.appx" release/
+          (cd release && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ScreenMirrorServer_${{ env.VERSION }}_store-upload
+          path: build/AppPackages/ScreenMirrorServer_${{ env.VERSION }}_x64.msixupload
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ScreenMirrorServer_${{ env.VERSION }}_sideload
+          path: release/
+          if-no-files-found: error
+
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<EOF
+          ## Install
+
+          **Xbox (retail):** from the Microsoft Store.
+
+          **Xbox in Developer Mode:** open Device Portal (\`https://<xbox-ip>:11443\`), choose *Add*, pick
+          \`ScreenMirrorServer_${VERSION}_x64.msix\`, add \`Microsoft.VCLibs.x64.14.00.appx\` as a
+          dependency, and install. Start it from *Games and apps* (an Xbox profile must be signed in).
+
+          **Windows 10/11 PC:** the package is signed with a self-signed certificate, so trust it first:
+          open \`ScreenMirrorServer_${VERSION}.cer\` > *Install Certificate* > *Local Machine* > *Place all
+          certificates in the following store* > *Trusted People*. Then install, in PowerShell:
+          \`Add-AppxPackage -Path ScreenMirrorServer_${VERSION}_x64.msix -DependencyPath Microsoft.VCLibs.x64.14.00.appx\`
+
+          Then, on an iPhone or iPad on the same network: Control Center > Screen Mirroring > *Xbox One*
+          (on a PC: *<computer name> (PC)*). The AirPlay button in music and video apps works the same way.
+
+          \`SHA256SUMS.txt\` has the files' checksums. See the README for what works and the known limitations.
+          EOF
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" release/* --clobber
+          else
+            gh release create "$TAG" release/* --verify-tag --title "Screen Mirror Server ${TAG#v}" --notes-file notes.md
+          fi
