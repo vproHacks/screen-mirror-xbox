@@ -56,8 +56,11 @@ jobs:
         shell: pwsh
         run: |
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $vs = & $vswhere -latest -products * -version "[17.0,18.0)" -property installationPath
-          $uwp = & $vswhere -latest -products * -version "[17.0,18.0)" -requires Microsoft.VisualStudio.ComponentGroup.UWP.VC -property installationPath
+          $all = @(& $vswhere -all -prerelease -products * -format json | ConvertFrom-Json)
+          $all | ForEach-Object { "found {0} {1} (complete: {2})" -f $_.installationPath, $_.installationVersion, $_.isComplete }
+          $vs = ($all | Where-Object { $_.installationVersion -like '17.*' } | Select-Object -First 1).installationPath
+          if (-not $vs) { throw "no Visual Studio 2022 instance on this runner" }
+          $uwp = & $vswhere -all -products * -version "[17.0,18.0)" -requires Microsoft.VisualStudio.ComponentGroup.UWP.VC -property installationPath
           if ($uwp) { "C++ UWP tools present in $vs"; exit 0 }
           "installing the C++ UWP tools into $vs"
           $p = Start-Process "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe" -Wait -PassThru `
