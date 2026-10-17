@@ -29,7 +29,8 @@ concurrency:
 
 jobs:
   release:
-    runs-on: windows-2025
+    # windows-2022: Visual Studio 2022 (the project uses its v143 toolset); windows-2025 has VS 2026
+    runs-on: windows-2022
     timeout-minutes: 180
     defaults:
       run:
