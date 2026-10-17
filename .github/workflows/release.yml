@@ -99,16 +99,24 @@ jobs:
         shell: cmd
         run: tools\build-app.cmd Release
 
-      - name: Build the Store upload package
-        shell: cmd
-        run: tools\build-store.cmd
-
+      # before the Store build, which writes an unsigned package to the same folder
       - name: Collect the release files
         run: |
           P="build/AppPackages/ScreenMirrorServer_${VERSION}_x64_Test"
           cp "$P/ScreenMirrorServer_${VERSION}_x64.msix" release/
           cp "$P/Dependencies/x64/Microsoft.VCLibs.x64.14.00.appx" release/
           (cd release && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+      - name: Check that the package is signed
+        shell: pwsh
+        run: |
+          $s = Get-AuthenticodeSignature "release/ScreenMirrorServer_${env:VERSION}_x64.msix"
+          "signature: $($s.Status), signer: $($s.SignerCertificate.Subject)"
+          if ($s.Status -eq 'NotSigned') { throw "the sideload package is not signed" }
+
+      - name: Build the Store upload package
+        shell: cmd
+        run: tools\build-store.cmd
 
       - uses: actions/upload-artifact@v4
         with:
